@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Oathsworn Dice Odds</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@1.0.0/css/bulma.min.css">
+    <style>
+        .pool-box { margin-bottom: 2rem; }
+        .prob-bar { height: 8px; background-color: #3273dc; border-radius: 4px; display: inline-block; }
+        .collapsible-header { cursor: pointer; user-select: none; }
+        .card { margin-bottom: 1.5rem; }
+    </style>
+</head>
+<body>
+    <section class="section">
+        <div class="container">
+            <h1 class="title">Oathsworn Dice Odds</h1>
+            <p class="subtitle">Probability information and calculator</p>
+
+            <!-- General Information Section -->
+            <div class="card">
+                <header class="card-header collapsible-header" onclick="toggleCollapse('general-info')">
+                    <p class="card-header-title">General Information</p>
+                    <button class="card-header-icon" aria-label="more options">
+                        <span class="icon">&#9660;</span>
+                    </button>
+                </header>
+                <div id="general-info" class="card-content is-hidden">
+                    <div class="content">
+                        <p>Oathsworn has four different colours of six-sided dice.</p>
+                        <table class="table is-fullwidth is-striped">
+                            <thead>
+                                <tr>
+                                    <th>Colour</th>
+                                    <th>Faces</th>
+                                    <th>Expected Value</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr><td>White (W)</td><td>0, 0, 1, 1, 2, 2*</td><td>0.8</td></tr>
+                                <tr><td>Yellow (Y)</td><td>0, 0, 1, 2, 3, 3*</td><td>1.2</td></tr>
+                                <tr><td>Red (R)</td><td>0, 0, 2, 3, 3, 4*</td><td>1.6</td></tr>
+                                <tr><td>Black (B)</td><td>0, 0, 3, 3, 4, 5*</td><td>2.0</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Hits and Crits Section -->
+            <div class="card">
+                <header class="card-header collapsible-header" onclick="toggleCollapse('hits-crits')">
+                    <p class="card-header-title">Hits and Crits</p>
+                    <button class="card-header-icon" aria-label="more options">
+                        <span class="icon">&#9660;</span>
+                    </button>
+                </header>
+                <div id="hits-crits" class="card-content is-hidden">
+                    <div class="content">
+                        <p>The below table shows the hit and crit probabilities of the different dice pool options. When it comes to maximizing your odds, 2-4 dice are an obvious "sweet spot." But to roll specific values, larger pools are needed. See the Defence Calculator section for more information.</p>
+                        <h3 class="title is-5">Dice Probability Table (1–10 Dice)</h3>
+                        <table class="table is-fullwidth is-striped is-hoverable">
+                            <thead>
+                                <tr>
+                                    <th>Number of Dice Rolled</th>
+                                    <th>Miss Rate (2+ Blanks)</th>
+                                    <th>Hit Rate (0–1 Blanks)</th>
+                                    <th>Crit Rate (Hit & 1+ Crit)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr><td>1</td><td>0.00%</td><td>100.00%</td><td>16.67%</td></tr>
+                                <tr><td>2</td><td>11.11%</td><td>88.89%</td><td>30.56%</td></tr>
+                                <tr><td>3</td><td>25.93%</td><td>74.07%</td><td>36.57%</td></tr>
+                                <tr><td>4</td><td>40.74%</td><td>59.26%</td><td>36.34%</td></tr>
+                                <tr><td>5</td><td>53.91%</td><td>46.09%</td><td>32.55%</td></tr>
+                                <tr><td>6</td><td>64.88%</td><td>35.12%</td><td>27.30%</td></tr>
+                                <tr><td>7</td><td>73.66%</td><td>26.34%</td><td>21.91%</td></tr>
+                                <tr><td>8</td><td>80.49%</td><td>19.51%</td><td>17.04%</td></tr>
+                                <tr><td>9</td><td>85.69%</td><td>14.31%</td><td>12.94%</td></tr>
+                                <tr><td>10</td><td>89.60%</td><td>10.40%</td><td>9.66%</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Defence Calculator Section -->
+            <div class="card">
+                <header class="card-header collapsible-header" onclick="toggleCollapse('defence-calculator')">
+                    <p class="card-header-title">Defence Calculator</p>
+                    <button class="card-header-icon" aria-label="more options">
+                        <span class="icon">&#9660;</span>
+                    </button>
+                </header>
+                <div id="defence-calculator" class="card-content">
+                    <p class="content">These data are based on a Monte Carlo style analysis. Each pool was rolled one million times and the results recorded.</p>
+                    <div class="field">
+                        <label class="label">Enemy Defence Value</label>
+                        <div class="control">
+                            <input id="defenceInput" class="input is-primary" type="number" value="1" min="1" step="1">
+                        </div>
+                        <p class="help">Damage = floor(Total Rolled / Defence)</p>
+                    </div>
+                    <div class="field">
+                        <label class="label">Filter by Damage (Optional)</label>
+                        <div class="control">
+                            <input id="damageFilterInput" class="input is-info" type="number" placeholder="Show all" min="1">
+                        </div>
+                        <p class="help">Only display results for a specific damage amount.</p>
+                    </div>
+                    <hr>
+                    <div id="resultsContainer">
+                        <div class="notification is-info is-light">Loading dice data...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <script>
+        let diceData = null;
+        let sortColumn = 'prob'; // Default sort column
+        let sortDirection = 'desc'; // Default sort direction
+
+        async function init() {
+            try {
+                const response = await fetch('./oathsworn.json');
+                if (!response.ok) throw new Error('Failed to load oathsworn.json');
+                diceData = await response.json();
+
+                document.getElementById('defenceInput').addEventListener('input', render);
+                document.getElementById('damageFilterInput').addEventListener('input', render);
+                render();
+            } catch (err) {
+                document.getElementById('resultsContainer').innerHTML = `
+                    <div class="notification is-danger">
+                        Error: ${err.message}. Make sure bin/oathsworn.json exists.
+                    </div>`;
+            }
+        }
+
+        function render() {
+            const defence = parseInt(document.getElementById('defenceInput').value) || 1;
+            const damageFilter = parseInt(document.getElementById('damageFilterInput').value) || null;
+            const container = document.getElementById('resultsContainer');
+            container.innerHTML = '';
+
+            // data can be an object (from results[name]) or an array as per prompt description
+            const pools = Array.isArray(diceData) ? diceData : Object.entries(diceData).map(([name, obj]) => ({
+                pool: name,
+                probs: obj.vals || obj.probs
+            }));
+
+            const allResults = [];
+
+            pools.forEach(poolData => {
+                const poolName = poolData.pool;
+                const probs = poolData.probs;
+                const damageMap = {};
+
+                const entries = Array.isArray(probs) ? probs : Object.entries(probs);
+                entries.forEach((entry) => {
+                    const [rollTotal, rollProb] = entry;
+                    const damage = Math.floor(parseInt(rollTotal) / defence);
+                    if (damage > 0) {
+                        damageMap[damage] = (damageMap[damage] || 0) + rollProb;
+                    }
+                });
+
+                Object.entries(damageMap).forEach(([dmg, prob]) => {
+                    const d = parseInt(dmg);
+                    if (damageFilter !== null && d !== damageFilter) return;
+                    const percentage = prob * 100;
+                    if (percentage.toFixed(2) !== "0.00") {
+                        allResults.push({ pool: poolName, damage: d, prob });
+                    }
+                });
+            });
+
+            allResults.sort((a, b) => {
+                let comparison = 0;
+                if (sortColumn === 'pool') {
+                    const weights = { 'B': 4, 'R': 3, 'Y': 2, 'W': 1 };
+                    if (a.pool.length !== b.pool.length) {
+                        comparison = a.pool.length - b.pool.length;
+                    } else {
+                        const sumA = [...a.pool].reduce((s, c) => s + weights[c], 0);
+                        const sumB = [...b.pool].reduce((s, c) => s + weights[c], 0);
+                        if (sumA !== sumB) {
+                            comparison = sumA - sumB;
+                        } else {
+                            for (let i = 0; i < a.pool.length; i++) {
+                                if (a.pool[i] !== b.pool[i]) {
+                                    comparison = weights[a.pool[i]] - weights[b.pool[i]];
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                } else if (sortColumn === 'damage') {
+                    comparison = a.damage - b.damage;
+                } else if (sortColumn === 'prob') {
+                    comparison = a.prob - b.prob;
+                }
+
+                return sortDirection === 'desc' ? comparison * -1 : comparison;
+            });
+
+            if (allResults.length === 0) {
+                container.innerHTML = '<div class="notification is-warning">No damage possible with current defence.</div>';
+                return;
+            }
+
+            const tableRows = allResults.map(item => `
+                <tr>
+                    <td class="has-text-weight-bold">${item.pool}</td>
+                    <td>${item.damage}</td>
+                    <td>${(item.prob * 100).toFixed(2)}%</td>
+                    <td style="width: 40%">
+                        <div class="prob-bar" style="width: ${item.prob * 100}%"></div>
+                    </td>
+                </tr>
+            `).join('');
+
+            container.innerHTML = `
+                <div class="box">
+                    <p class="subtitle is-6 has-text-grey mb-4">Showing ${allResults.length} possible outcomes</p>
+                    <table class="table is-fullwidth is-striped is-hoverable">
+                        <thead>
+                            <tr>
+                                <th onclick="sortTable('pool')" style="cursor: pointer;">
+                                    Pool
+                                    ${sortColumn === 'pool' ? (sortDirection === 'asc' ? ' &#9650;' : ' &#9660;') : ''}
+                                </th>
+                                <th onclick="sortTable('damage')" style="cursor: pointer;">
+                                    Damage
+                                    ${sortColumn === 'damage' ? (sortDirection === 'asc' ? ' &#9650;' : ' &#9660;') : ''}
+                                </th>
+                                <th onclick="sortTable('prob')" style="cursor: pointer;">
+                                    Odds
+                                    ${sortColumn === 'prob' ? (sortDirection === 'asc' ? ' &#9650;' : ' &#9660;') : ''}
+                                </th>
+                                <th>Visual</th>
+                            </tr>
+                        </thead>
+                        <tbody>${tableRows}</tbody>
+                    </table>
+                </div>`;
+        }
+
+        function sortTable(column) {
+            if (sortColumn === column) {
+                sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                sortColumn = column;
+                sortDirection = 'desc';
+            }
+            render();
+        }
+
+        function toggleCollapse(id) {
+            const element = document.getElementById(id);
+            element.classList.toggle('is-hidden');
+        }
+
+        init();
+    </script>
+</body>
+</html>
