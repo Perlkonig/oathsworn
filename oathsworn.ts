@@ -1,6 +1,8 @@
 /**
+ * Legacy Monte Carlo generator — superseded by exact combinatorial math in oathsworn.html.
  * This file generates the JSON results. It rolls each pool a million times and records the results.
  */
+import { writeFileSync } from "fs";
 
 type DieFace = {value: number, exploding: boolean};
 
@@ -127,7 +129,6 @@ const addToMap = (map: Map<number,number>, key: number): void => {
     }
 }
 
-import { writeFileSync } from "fs";
 const runs = 1000000;
 let results: Results = {};
 for (let len = 1; len <= 6; len++) {

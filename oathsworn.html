@@ -28,7 +28,7 @@
                 </header>
                 <div id="general-info" class="card-content is-hidden">
                     <div class="content">
-                        <p>Oathsworn has four different colours of six-sided dice.</p>
+                        <p>Oathsworn has four different colours of six-sided dice. Crit faces (marked *) explode: their value is added and the die is rolled again.</p>
                         <table class="table is-fullwidth is-striped">
                             <thead>
                                 <tr>
@@ -37,12 +37,7 @@
                                     <th>Expected Value</th>
                                 </tr>
                             </thead>
-                            <tbody>
-                                <tr><td>White (W)</td><td>0, 0, 1, 1, 2, 2*</td><td>0.8</td></tr>
-                                <tr><td>Yellow (Y)</td><td>0, 0, 1, 2, 3, 3*</td><td>1.2</td></tr>
-                                <tr><td>Red (R)</td><td>0, 0, 2, 3, 3, 4*</td><td>1.6</td></tr>
-                                <tr><td>Black (B)</td><td>0, 0, 3, 3, 4, 5*</td><td>2.0</td></tr>
-                            </tbody>
+                            <tbody id="dice-info-body"></tbody>
                         </table>
                     </div>
                 </div>
@@ -95,7 +90,7 @@
                     </button>
                 </header>
                 <div id="defence-calculator" class="card-content">
-                    <p class="content">These data are based on a Monte Carlo style analysis. Each pool was rolled one million times and the results recorded.</p>
+                    <p class="content">These data are computed by exact combinatorial analysis: every initial face combination is enumerated and crit explosions are resolved via probability convolution.</p>
                     <div class="field">
                         <label class="label">Enemy Defence Value</label>
                         <div class="control">
@@ -121,24 +116,270 @@
 
     <script>
         let diceData = null;
-        let sortColumn = 'prob'; // Default sort column
-        let sortDirection = 'desc'; // Default sort direction
+        let sortColumn = 'prob';
+        let sortDirection = 'desc';
 
-        async function init() {
-            try {
-                const response = await fetch('./oathsworn.json');
-                if (!response.ok) throw new Error('Failed to load oathsworn.json');
-                diceData = await response.json();
+        const DICE = {
+            W: { name: 'W', seq: 1, label: 'White (W)', facesDisplay: '0, 0, 1, 1, 2, 2*', raw: [0, 0, 1, 1, 2, '2'] },
+            Y: { name: 'Y', seq: 2, label: 'Yellow (Y)', facesDisplay: '0, 0, 1, 2, 3, 3*', raw: [0, 0, 1, 2, 3, '3'] },
+            R: { name: 'R', seq: 3, label: 'Red (R)', facesDisplay: '0, 0, 2, 3, 3, 4*', raw: [0, 0, 2, 3, 3, '4'] },
+            B: { name: 'B', seq: 4, label: 'Black (B)', facesDisplay: '0, 0, 3, 3, 4, 5*', raw: [0, 0, 3, 3, 4, '5'] },
+        };
 
-                document.getElementById('defenceInput').addEventListener('input', render);
-                document.getElementById('damageFilterInput').addEventListener('input', render);
-                render();
-            } catch (err) {
-                document.getElementById('resultsContainer').innerHTML = `
-                    <div class="notification is-danger">
-                        Error: ${err.message}. Make sure bin/oathsworn.json exists.
-                    </div>`;
+        for (const key of Object.keys(DICE)) {
+            DICE[key].faces = parseFaces(DICE[key].raw);
+        }
+
+        function parseFaces(raw) {
+            return raw.map(f => typeof f === 'string'
+                ? { value: parseInt(f, 10), exploding: true }
+                : { value: f, exploding: false });
+        }
+
+        function expectedValue(faces) {
+            const sum = faces.reduce((s, f) => s + f.value, 0);
+            return sum / 5;
+        }
+
+        function addProb(pmf, key, amount) {
+            pmf.set(key, (pmf.get(key) || 0) + amount);
+        }
+
+        function diePMF(faces) {
+            const crit = faces.find(f => f.exploding);
+            const pmf = new Map();
+            for (const f of faces) {
+                if (!f.exploding) {
+                    addProb(pmf, f.value, 1 / 6);
+                }
             }
+            let tail = new Map(pmf);
+            while (true) {
+                let delta = 0;
+                const nextTail = new Map();
+                for (const [t, p] of tail) {
+                    const add = p / 6;
+                    if (add < 1e-20) continue;
+                    const shifted = t + crit.value;
+                    addProb(pmf, shifted, add);
+                    addProb(nextTail, shifted, add);
+                    delta = Math.max(delta, add);
+                }
+                tail = nextTail;
+                if (delta < 1e-15) break;
+            }
+            return pmf;
+        }
+
+        function prune(pmf, epsilon = 1e-14) {
+            const out = new Map();
+            for (const [k, v] of pmf) {
+                if (v >= epsilon) out.set(k, v);
+            }
+            return out;
+        }
+
+        function convolve(a, b) {
+            if (a.size === 0) return new Map();
+            if (b.size === 0) return new Map();
+            if (a.size > b.size) return convolve(b, a);
+            if (a.size === 1) {
+                const [[x, px]] = a;
+                const out = new Map();
+                for (const [y, py] of b) {
+                    addProb(out, x + y, px * py);
+                }
+                return out;
+            }
+            const out = new Map();
+            for (const [x, px] of a) {
+                for (const [y, py] of b) {
+                    addProb(out, x + y, px * py);
+                }
+            }
+            return out;
+        }
+
+        function buildPmfPowCache(diePMFCache) {
+            const cache = {};
+            for (const key of Object.keys(diePMFCache)) {
+                cache[key] = [new Map([[0, 1]])];
+                for (let k = 1; k <= 6; k++) {
+                    cache[key][k] = prune(convolve(cache[key][k - 1], diePMFCache[key]));
+                }
+            }
+            return cache;
+        }
+
+        function* combinationsWithReplacement(iterable, r) {
+            const pool = Array.from(iterable);
+            const n = pool.length;
+            if (r === 0) {
+                yield [];
+                return;
+            }
+            if (n === 0 || r < 0) return;
+
+            const indices = new Array(r).fill(0);
+            yield indices.map(i => pool[i]);
+
+            while (true) {
+                let i = r - 1;
+                while (i >= 0 && indices[i] === n - 1) i--;
+                if (i < 0) return;
+                const nextVal = indices[i] + 1;
+                for (let j = i; j < r; j++) indices[j] = nextVal;
+                yield indices.map(idx => pool[idx]);
+            }
+        }
+
+        function factorial(n) {
+            let f = 1;
+            for (let i = 2; i <= n; i++) f *= i;
+            return f;
+        }
+
+        function* faceCountCombos(k) {
+            const counts = new Array(6).fill(0);
+            function* rec(pos, remaining) {
+                if (pos === 5) {
+                    counts[5] = remaining;
+                    yield counts.slice();
+                    return;
+                }
+                for (let c = 0; c <= remaining; c++) {
+                    counts[pos] = c;
+                    yield* rec(pos + 1, remaining - c);
+                }
+            }
+            yield* rec(0, k);
+        }
+
+        function buildTypeOutcomes(die, count) {
+            const outcomes = [];
+            for (const combo of faceCountCombos(count)) {
+                let blanks = 0;
+                let base = 0;
+                let crits = 0;
+                let multinomial = factorial(count);
+                for (let f = 0; f < 6; f++) {
+                    const c = combo[f];
+                    if (c === 0) continue;
+                    multinomial /= factorial(c);
+                    const face = die.faces[f];
+                    if (face.value === 0) blanks += c;
+                    base += face.value * c;
+                    if (face.exploding) crits += c;
+                }
+                outcomes.push({ blanks, base, crits, multinomial });
+            }
+            return outcomes;
+        }
+
+        function computePoolPMF(poolDice, pmfPowCache) {
+            const n = poolDice.length;
+            const outcomes = new Map();
+            const weightDenom = 6 ** n;
+            const dieNames = ['W', 'Y', 'R', 'B'];
+
+            const typeGroups = [];
+            const typeCounts = { W: 0, Y: 0, R: 0, B: 0 };
+            for (const die of poolDice) typeCounts[die.name]++;
+            for (const name of dieNames) {
+                if (typeCounts[name] > 0) {
+                    typeGroups.push({
+                        name,
+                        outcomes: buildTypeOutcomes(DICE[name], typeCounts[name]),
+                    });
+                }
+            }
+
+            function combine(groupIdx, state) {
+                if (groupIdx === typeGroups.length) {
+                    if (state.blanks >= 2) {
+                        addProb(outcomes, 0, state.weight);
+                        return;
+                    }
+                    let dist = new Map([[state.base, state.weight]]);
+                    for (const name of dieNames) {
+                        const count = state.critCounts[name];
+                        if (count > 0) {
+                            dist = prune(convolve(dist, pmfPowCache[name][count]));
+                        }
+                    }
+                    for (const [total, p] of dist) {
+                        addProb(outcomes, total, p);
+                    }
+                    return;
+                }
+                const group = typeGroups[groupIdx];
+                for (const outcome of group.outcomes) {
+                    combine(groupIdx + 1, {
+                        blanks: state.blanks + outcome.blanks,
+                        base: state.base + outcome.base,
+                        critCounts: {
+                            ...state.critCounts,
+                            [group.name]: outcome.crits,
+                        },
+                        weight: state.weight * outcome.multinomial,
+                    });
+                }
+            }
+
+            combine(0, {
+                blanks: 0,
+                base: 0,
+                critCounts: { W: 0, Y: 0, R: 0, B: 0 },
+                weight: 1 / weightDenom,
+            });
+            return outcomes;
+        }
+
+        function computeAllPools() {
+            const diePMFCache = {};
+            for (const key of Object.keys(DICE)) {
+                diePMFCache[key] = diePMF(DICE[key].faces);
+            }
+            const pmfPowCache = buildPmfPowCache(diePMFCache);
+            const diceList = [DICE.B, DICE.R, DICE.Y, DICE.W];
+            const results = [];
+            for (let len = 1; len <= 6; len++) {
+                for (const grp of combinationsWithReplacement(diceList, len)) {
+                    const sorted = [...grp].sort((a, b) => b.seq - a.seq);
+                    const name = sorted.map(d => d.name).join('');
+                    const pmf = computePoolPMF(sorted, pmfPowCache);
+                    const probs = [...pmf.entries()].sort((a, b) => a[0] - b[0]);
+                    results.push({ pool: name, probs });
+                }
+            }
+            return results;
+        }
+
+        function populateDiceTable() {
+            const tbody = document.getElementById('dice-info-body');
+            tbody.innerHTML = ['W', 'Y', 'R', 'B'].map(key => {
+                const d = DICE[key];
+                const ev = expectedValue(d.faces);
+                return `<tr><td>${d.label}</td><td>${d.facesDisplay}</td><td>${ev.toFixed(1)}</td></tr>`;
+            }).join('');
+        }
+
+        function init() {
+            populateDiceTable();
+            document.getElementById('defenceInput').addEventListener('input', render);
+            document.getElementById('damageFilterInput').addEventListener('input', render);
+
+            setTimeout(() => {
+                try {
+                    diceData = computeAllPools();
+                    render();
+                } catch (err) {
+                    document.getElementById('resultsContainer').innerHTML = `
+                        <div class="notification is-danger">
+                            Error computing dice data: ${err.message}
+                        </div>`;
+                }
+            }, 0);
         }
 
         function render() {
